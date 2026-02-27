@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 project(h264-mp4-encoder)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fpermissive")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
 
 add_library(h264-mp4-encoder-library
     h264-mp4-encoder.cpp
@@ -115,34 +115,50 @@ target_include_directories(h264-mp4-encoder-library PRIVATE
     "minih264"
 )
 
-add_executable(h264-mp4-encoder-test
-    main.cpp
-)
+if(NOT EMSCRIPTEN)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lpthread")
 
-target_link_libraries(h264-mp4-encoder-test h264-mp4-encoder-library)
+    add_executable(h264-mp4-encoder-test
+        main.cpp
+    )
+
+    target_link_libraries(h264-mp4-encoder-test h264-mp4-encoder-library)
+endif()
 
 if(EMSCRIPTEN)
-    set(CMAKE_CXX_FLAGS "\
-        ${CMAKE_CXX_FLAGS}\
-        -s DISABLE_EXCEPTION_CATCHING=0\
-        -s ALLOW_MEMORY_GROWTH=1\
-        -s WASM=1\
-        -s EXTRA_EXPORTED_RUNTIME_METHODS=['FS']\
-        -s SINGLE_FILE=1\
-        -s MODULARIZE=1\
-        -s EXPORT_NAME=H264MP4Module\
-        -Wno-invalid-source-encoding\
-        -Wno-tautological-pointer-compare\
-        -O2\
-        --closure 1\
-        -g0\
-        --bind\
-    ")
+    set(EMCC_COMPILE_OPTIONS
+        -fexceptions
+        -Wno-invalid-source-encoding
+        -Wno-tautological-pointer-compare
+        -O3
+        -g0
+    )
+
+    target_compile_options(h264-mp4-encoder-library PRIVATE ${EMCC_COMPILE_OPTIONS})
 
     add_executable(h264-mp4-encoder
         emscripten.cpp
     )
+
     target_link_libraries(h264-mp4-encoder h264-mp4-encoder-library)
+
+    target_compile_options(h264-mp4-encoder PRIVATE ${EMCC_COMPILE_OPTIONS})
+
+    target_link_options(h264-mp4-encoder PRIVATE
+        -fexceptions
+        -O3
+        -g0
+        -sDISABLE_EXCEPTION_CATCHING=0
+        -sALLOW_MEMORY_GROWTH=1
+        -sWASM=1
+        -sEXPORTED_RUNTIME_METHODS=FS
+        -sENVIRONMENT=shell
+        -sMODULARIZE=1
+        -sEXPORT_NAME=H264MP4Module
+        -sASSERTIONS=1
+        --bind
+    )
+
     set_target_properties(
         h264-mp4-encoder
         PROPERTIES
